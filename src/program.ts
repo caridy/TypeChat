@@ -67,6 +67,11 @@ export type ResultReference = {
     "@ref": number;
 };
 
+export type TranslationHooks = {
+    ref?: (index: number) => string;
+    func?: (name: string, args: any[]) => string;
+};
+
 /**
  * Transforms a JSON program object into an equivalent TypeScript module suitable for type checking.
  * The generated module takes the form:
@@ -82,7 +87,7 @@ export type ResultReference = {
  * @returns A `Success<string>` with the module source code or an `Error` explaining why the JSON object
  * couldn't be transformed.
  */
-export function createModuleTextFromProgram(jsonObject: object): Result<string> {
+export function createModuleTextFromProgram(jsonObject: object, hooks?: TranslationHooks): Result<string> {
     const steps = (jsonObject as Program)["@steps"];
     if (!(Array.isArray(steps) && steps.every(step => typeof step === "object" && step !== null && step.hasOwnProperty("@func")))) {
         return error("JSON object is not a valid program");
@@ -108,7 +113,7 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
         if (obj.hasOwnProperty("@ref")) {
             const index = obj["@ref"];
             if (typeof index === "number" && index < currentStep && Object.keys(obj).length === 1) {
-                return `step${index + 1}`;
+                return hooks?.ref ? hooks.ref(index + 1) : `step${index + 1}`;
             }
         }
         else if (obj.hasOwnProperty("@func")) {
@@ -116,7 +121,7 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
             const hasArgs = obj.hasOwnProperty("@args");
             const args = hasArgs ? obj["@args"] : [];
             if (typeof func === "string" && (Array.isArray(args)) && Object.keys(obj).length === (hasArgs ? 2 : 1)) {
-                return `api.${func}(${arrayToString(args)})`;
+                return hooks?.func ? hooks.func(func, args.map(exprToString)) : `api.${func}(${arrayToString(args)})`;
             }
         }
         else if (Array.isArray(obj)) {
@@ -192,9 +197,9 @@ export async function evaluateJsonProgram(program: Program, onCall: (func: strin
  * @param schema The TypeScript source code for the target API. The source code must export a type named `API`.
  * @returns A `TypeChatJsonTranslator<Program>` instance.
  */
-export function createProgramTranslator(model: TypeChatLanguageModel, schema: string): TypeChatJsonTranslator<Program> {
+export function createProgramTranslator(model: TypeChatLanguageModel, schema: string, hooks?: TranslationHooks): TypeChatJsonTranslator<Program> {
     const translator = createJsonTranslator<Program>(model, schema, "Program");
-    translator.validator.createModuleTextFromJson = createModuleTextFromProgram;
+    translator.validator.createModuleTextFromJson = (jsonObject: object) => createModuleTextFromProgram(jsonObject, hooks);
     translator.createRequestPrompt = createRequestPrompt;
     translator.createRepairPrompt = createRepairPrompt;
     return translator;
