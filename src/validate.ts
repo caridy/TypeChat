@@ -1,15 +1,25 @@
 import * as ts from 'typescript';
 import { Result, success, error, Success } from './result';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const libText = `interface Array<T> { length: number, [n: number]: T }
-interface Object { toString(): string }
-interface Function { prototype: unknown }
-interface CallableFunction extends Function {}
-interface NewableFunction extends Function {}
-interface String { readonly length: number }
-interface Boolean { valueOf(): boolean }
-interface Number { valueOf(): number }
-interface RegExp { test(string: string): boolean }`;
+function readTypeScriptDefinitions(): string {
+    const filePath = path.join(__dirname, '..', 'node_modules', 'typescript', 'lib', 'lib.es5.d.ts');
+    return fs.readFileSync(filePath, 'utf-8');
+}
+
+// using the local definition from typescript
+const libText = readTypeScriptDefinitions();
+
+// const libText = `interface Array<T> { length: number, [n: number]: T }
+// interface Object { toString(): string }
+// interface Function { prototype: unknown }
+// interface CallableFunction extends Function {}
+// interface NewableFunction extends Function {}
+// interface String { readonly length: number }
+// interface Boolean { valueOf(): boolean }
+// interface Number { valueOf(): number }
+// interface RegExp { test(string: string): boolean }`;
 
 /**
  * Represents an object that can validate JSON strings according to a given TypeScript schema.
