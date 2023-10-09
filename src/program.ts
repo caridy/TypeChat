@@ -88,6 +88,7 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
         return error("JSON object is not a valid program");
     }
     let hasError = false;
+    let errorMessages: string[] = [];
     let functionBody = "";
     let currentStep = 0;
     while (currentStep < steps.length) {
@@ -95,7 +96,7 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
         currentStep++;
     }
     return hasError ?
-        error("JSON program contains an invalid expression") :
+        error(`JSON program contains an error:\n${errorMessages.join("\n")}`) :
         success(`import { API } from "./schema";\nfunction program(api: API) {\n${functionBody}}`);
 
     function exprToString(expr: unknown): string {
@@ -107,7 +108,16 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
     function objectToString(obj: Record<string, unknown>) {
         if (obj.hasOwnProperty("@ref")) {
             const index = obj["@ref"];
-            if (typeof index === "number" && index < currentStep && Object.keys(obj).length === 1) {
+            if (typeof index !== "number") {
+                hasError = true;
+                errorMessages.push(`TypeError: @ref=${index} in step ${currentStep} must be a number.`);
+            } else if (index >= currentStep) {
+                hasError = true;
+                errorMessages.push(`RangeError: @ref=${index} in step ${currentStep} can only reference a previous step.`);
+            } else if (Object.keys(obj).length !== 1) {
+                hasError = true;
+                errorMessages.push(`TypeError: Object with @ref=${index} in step ${currentStep} contains invalid keys.`);
+            } else {
                 return `step${index + 1}`;
             }
         }
@@ -115,7 +125,16 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
             const func = obj["@func"];
             const hasArgs = obj.hasOwnProperty("@args");
             const args = hasArgs ? obj["@args"] : [];
-            if (typeof func === "string" && (Array.isArray(args)) && Object.keys(obj).length === (hasArgs ? 2 : 1)) {
+            if (typeof func !== "string") {
+                hasError = true;
+                errorMessages.push(`TypeError: @func="${func}" in step ${currentStep} must be a string.`);
+            } else if (!Array.isArray(args)) {
+                hasError = true;
+                errorMessages.push(`TypeError: @args in step ${currentStep} must be an array.`);
+            } else if (Object.keys(obj).length !== (hasArgs ? 2 : 1)) {
+                hasError = true;
+                errorMessages.push(`TypeError: Object with @func="${func}" in step ${currentStep} contains invalid keys.`);
+            } else {
                 return `api.${func}(${arrayToString(args)})`;
             }
         }
@@ -125,8 +144,7 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
         else {
             return `{ ${Object.keys(obj).map(key => `${JSON.stringify(key)}: ${exprToString(obj[key])}`).join(", ")} }`;
         }
-        hasError = true;
-        return "";
+        return "undefined";
     }
 
     function arrayToString(array: unknown[]) {
