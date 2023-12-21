@@ -113,7 +113,7 @@ export function createModuleTextFromProgram(jsonObject: object): Result<string> 
                 errorMessages.push(`TypeError: @ref=${index} in step ${currentStep} must be a number.`);
             } else if (index >= currentStep) {
                 hasError = true;
-                errorMessages.push(`RangeError: @ref=${index} in step ${currentStep} can only reference a previous step.`);
+                errorMessages.push(`RangeError: Invalid ResultReference in step ${currentStep}, it can only reference a value of an expression from a preceding step.`);
             } else if (Object.keys(obj).length !== 1) {
                 hasError = true;
                 errorMessages.push(`TypeError: Object with @ref=${index} in step ${currentStep} contains invalid keys.`);
